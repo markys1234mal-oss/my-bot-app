@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Mini App</title>
+    <!-- Скрипт для связи сайта с Телеграмом -->
+    <script src="https://telegram.org"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 18px;
+            background-color: #2481cc;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Лодка создана! ⛵</h1>
+    <p>Твой сайт успешно работает внутри Telegram.</p>
+    <button id="close-btn">Закрыть</button>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Развернуть на весь экран
+
+        // Кнопка закрытия
+        document.getElementById('close-btn').addEventListener('click', () => {
+            tg.close();
+        });
+    </script>
+</body>
+</html>
