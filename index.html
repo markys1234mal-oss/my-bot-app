@@ -2,47 +2,219 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Mini App</title>
-    <!-- Скрипт для связи сайта с Телеграмом -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Soothe Upgrade - Telegram Gifts</title>
     <script src="https://telegram.org"></script>
     <style>
         body {
-            font-family: sans-serif;
-            background-color: #1a1a1a;
-            color: #ffffff;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
+            margin: 0; background-color: #0e0e0e; color: #ffffff;
+            font-family: 'Arial', sans-serif; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; min-height: 100vh;
+            overflow: hidden; user-select: none; -webkit-user-select: none;
         }
-        button {
-            padding: 12px 24px;
-            font-size: 18px;
-            background-color: #2481cc;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
+        #gameCanvas {
+            background-color: #0e0e0e; border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6); display: block;
         }
     </style>
 </head>
 <body>
-    <h1>Лодка создана! ⛵</h1>
-    <p>Твой сайт успешно работает внутри Telegram.</p>
-    <button id="close-btn">Закрыть</button>
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand(); // Развернуть на весь экран
+<canvas id="gameCanvas" width="460" height="600"></canvas>
 
-        // Кнопка закрытия
-        document.getElementById('close-btn').addEventListener('click', () => {
-            tg.close();
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Твоя цветовая палитра из Pygame
+    const colors = {
+        bg: '#0e0e0e', card: '#181818', inp: '#121212', white: '#ffffff',
+        gray: '#6e6e6e', d_gray: '#323232', btn: '#f0f0f0', btn_h: '#bebebe',
+        btn_d: '#282828', sector: '#b4b4b4'
+    };
+
+    // Настройки баланса и игры (каждый раз при старте выдается ровно 100)
+    let balance = 100; 
+    let statusText = "Выберите ставку и нажмите КРУТИТЬ";
+    let statusColor = colors.gray;
+    let currentTab = "upgrade"; // вкладки: upgrade, cases, inventory
+
+    let betValue = 10;
+    let chanceValue = 50;
+    let isAnim = false;
+    let angle = 0;
+    let speed = 0;
+
+    // Снежинки для заднего фона
+    let snow = [];
+    for(let i=0; i<60; i++) {
+        snow.push({
+            x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+            s: Math.random() * 1.1 + 0.7, r: Math.random() * 2 + 1, sw: Math.random() * 6
         });
-    </script>
+    }
+
+    function drawDecor() {
+        ctx.strokeStyle = colors.d_gray; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(460, 40); ctx.bezierCurveTo(380,60, 300,90, 210,180); ctx.stroke();
+        
+        ctx.fillStyle = colors.white;
+        snow.forEach(f => {
+            f.y += f.s; f.sw += 0.02;
+            let cx = f.x + Math.sin(f.sw) * 0.5;
+            if(f.y > canvas.height) { f.y = -10; f.x = Math.random() * canvas.width; }
+            ctx.beginPath(); ctx.arc(cx, f.y, f.r, 0, Math.PI*2); ctx.fill();
+        });
+    }
+
+    function drawWheel(cx, cy, r, chance) {
+        ctx.save();
+        // Сектор проигрыша (серый)
+        ctx.fillStyle = colors.d_gray;
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+        
+        // Сектор выигрыша
+        ctx.fillStyle = colors.sector;
+        let arcAngle = (chance / 100) * Math.PI * 2;
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + arcAngle); ctx.fill();
+        
+        ctx.strokeStyle = colors.white; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+        ctx.restore();
+
+        // Стрелка крутилки
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        ctx.strokeStyle = colors.white; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0, -r + 10); ctx.stroke();
+        ctx.fillStyle = '#ff2d2d'; ctx.beginPath(); ctx.arc(0, -r + 5, 6, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+    }
+
+    function tick() {
+        ctx.fillStyle = colors.bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        if (currentTab === "upgrade") {
+            drawDecor();
+            
+            // Карточка баланса
+            ctx.fillStyle = colors.card; ctx.fillRect(20, 20, 420, 60);
+            ctx.fillStyle = colors.white; ctx.font = "bold 20px Arial";
+            ctx.fillText(`Баланс: ${balance} ⭐️`, 40, 56);
+
+            // Колесо апгрейда
+            drawWheel(canvas.width / 2, 220, 95, chanceValue);
+
+            // Текст статуса игры
+            ctx.fillStyle = statusColor; ctx.font = "bold 15px Arial";
+            ctx.textAlign = "center"; ctx.fillText(statusText, canvas.width/2, 350);
+            ctx.textAlign = "left";
+
+            // Инпуты (Кнопки изменения ставки и шанса)
+            ctx.fillStyle = colors.card; ctx.fillRect(40, 380, 160, 55);
+            ctx.fillStyle = colors.gray; ctx.font = "12px Arial"; ctx.fillText("Ставка (нажми -/+)", 50, 398);
+            ctx.fillStyle = colors.white; ctx.font = "bold 16px Arial"; ctx.fillText(`${betValue} ⭐️`, 50, 422);
+
+            ctx.fillStyle = colors.card; ctx.fillRect(260, 380, 160, 55);
+            ctx.fillStyle = colors.gray; ctx.font = "12px Arial"; ctx.fillText("Шанс % (нажми -/+)", 270, 398);
+            ctx.fillStyle = colors.white; ctx.font = "bold 16px Arial"; ctx.fillText(`${chanceValue}%`, 270, 422);
+
+            // Кнопка запуска
+            ctx.fillStyle = isAnim ? colors.btn_d : colors.btn;
+            ctx.fillRect(40, 470, 380, 50);
+            ctx.fillStyle = isAnim ? colors.gray : colors.bg;
+            ctx.font = "bold 18px Arial"; ctx.fillText("КРУТИТЬ СТАВКУ", 155, 502);
+        } else if (currentTab === "cases") {
+            ctx.fillStyle = colors.white; ctx.font = "bold 20px Arial";
+            ctx.fillText("📦 Открытие Кейсов (В разработке)", 60, 250);
+        } else {
+            ctx.fillStyle = colors.white; ctx.font = "bold 20px Arial";
+            ctx.fillText("💼 Ваш Инвентарь (В разработке)", 80, 250);
+        }
+
+        // Нижнее меню навигации (Табы)
+        ctx.fillStyle = colors.card; ctx.fillRect(0, 540, 460, 60);
+        let labels = ["Апгрейд", "Кейсы", "Инвентарь"];
+        let tabs = ["upgrade", "cases", "inventory"];
+        
+        tabs.forEach((tab, i) => {
+            ctx.fillStyle = currentTab === tab ? colors.white : colors.gray;
+            ctx.font = "bold 14px Arial"; ctx.fillText(labels[i], 45 + i*150, 575);
+        });
+
+        // Физика вращения колеса рулетки
+        if (isAnim) {
+            angle += speed;
+            speed *= 0.98;
+            if (speed < 0.01) {
+                isAnim = false;
+                
+                let finalAngle = (angle % (Math.PI * 2)) / (Math.PI * 2);
+                let checkValue = (1 - finalAngle) * 100;
+                
+                if (checkValue <= chanceValue || finalAngle === 0) {
+                    let winAmount = Math.floor(betValue * (100 / chanceValue));
+                    balance += winAmount;
+                    statusText = `Победа! Вы получили +${winAmount} ⭐️`;
+                    statusColor = "#5ab996";
+                } else {
+                    statusText = "Проигрыш! Попробуйте снова.";
+                    statusColor = "#ff4b2d";
+                }
+            }
+        }
+
+        requestAnimationFrame(tick);
+    }
+
+    // Обработка тапов по экрану (Интерфейс Pygame)
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        if (y > 540) { // Переключение вкладок
+            if (x < 150) currentTab = "upgrade";
+            else if (x < 300) currentTab = "cases";
+            else currentTab = "inventory";
+            return;
+        }
+
+        if (currentTab === "upgrade" && !isAnim) {
+            // Клик по блоку Ставки (меняет ставку по кругу: 10 -> 25 -> 50 -> 100 -> 10)
+            if (x > 40 && x < 200 && y > 380 && y < 435) {
+                if (betValue === 10) betValue = 25;
+                else if (betValue === 25) betValue = 50;
+                else if (betValue === 50) betValue = 100;
+                else betValue = 10;
+            }
+            // Клик по блоку Шанса (меняет шанс: 25% -> 50% -> 75% -> 25%)
+            if (x > 260 && x < 420 && y > 380 && y < 435) {
+                if (chanceValue === 25) chanceValue = 50;
+                else if (chanceValue === 50) chanceValue = 75;
+                else chanceValue = 25;
+            }
+            // Кнопка КРУТИТЬ
+            if (x > 40 && x < 420 && y > 470 && y < 520) {
+                if (balance >= betValue) {
+                    balance -= betValue;
+                    isAnim = true;
+                    speed = Math.random() * 0.35 + 0.25; // Случайная скорость прокрутки
+                    statusText = "Стрелка вращается...";
+                    statusColor = colors.white;
+                } else {
+                    statusText = "Недостаточно Звёзд!";
+                    statusColor = "#ff4b2d";
+                }
+            }
+        }
+    });
+
+    tick();
+</script>
 </body>
 </html>
